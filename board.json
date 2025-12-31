@@ -1,17 +1,34 @@
 {
   "schemaVersion": 1,
-  "id": "6degree-template",
+  "id": "6degree-board",
   "title": "6Degree Snakes & Ladders",
   "description": "Complete tasks, submit proof, climb ladders, avoid snakes.",
-  "boardSize": 101,
+  "boardSize": 30,
   "tilesBasePath": "tiles",
-"tiles": [
-  {
-    "id": 0,
-    "type": "start",
-    "title": "Start",
-    "description": "Begin your journey.",
-    "image": "0.png",
-    "requiresProof": false
-  }
-]
+  "tiles": [
+    {
+      "id": 0,
+      "type": "start",
+      "title": "Start",
+      "description": "Begin your journey.",
+      "image": "0.png",
+      "requiresProof": false
+    },
+    {
+      "id": 1,
+      "type": "task",
+      "title": "Task placeholder",
+      "description": "Replace this with a real task.",
+      "image": "1.png",
+      "requiresProof": true
+    },
+    {
+      "id": 30,
+      "type": "finish",
+      "title": "Finish",
+      "description": "End of the board.",
+      "image": "30.png",
+      "requiresProof": false
+    }
+  ]
+}
