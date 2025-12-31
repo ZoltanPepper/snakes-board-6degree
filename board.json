@@ -23,6 +23,14 @@
       "requiresProof": true
     },
     {
+      "id": 8,
+      "type": "task",
+      "title": "Vorkath Unique",
+      "description": "Recieve any Vorkath Unique, not including Head",
+      "image": "30.png",
+      "requiresProof": true
+        },
+    {
       "id": 30,
       "type": "finish",
       "title": "Finish",
