@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "6degree-template",
+  "title": "6Degree Snakes & Ladders",
+  "description": "Complete tasks, submit proof, climb ladders, avoid snakes.",
+  "boardSize": 101,
+  "tilesBasePath": "tiles",
+  "tiles": []
+}
