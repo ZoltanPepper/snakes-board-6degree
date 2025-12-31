@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Snakes & Ladders Board Builder</title>
+  <style>
+    :root { --bg:#0b0f14; --panel:#121a22; --muted:#7f93aa; --text:#e7eef7; --accent:#66d9ff; --danger:#ff5c5c; }
+    * { box-sizing: border-box; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    body { margin:0; background:var(--bg); color:var(--text); }
+    header { padding:12px 16px; border-bottom:1px solid #1d2a38; display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+    header h1 { margin:0; font-size:16px; letter-spacing:.2px; }
+    .wrap { display:grid; grid-template-columns: 1fr 360px; gap:12px; padding:12px; }
+    .panel { background:var(--panel); border:1px solid #1d2a38; border-radius:12px; padding:12px; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .row > * { flex: 0 0 auto; }
+    label { font-size:12px; color:var(--muted); display:block; margin-bottom:4px; }
+    input, select, textarea, button {
+      background:#0e141c; color:var(--text);
+      border:1px solid #223244; border-radius:10px;
+      padding:8px 10px; outline:none;
+    }
+    textarea { width:100%; min-height:88px; resize:vertical; }
+    input[type="number"] { width:110px; }
+    input[type="text"] { width:100%; }
+    button { cursor:pointer; }
+    button.primary { border-color:#2a5666; background:#0d2630; }
+    button.danger { border-color:#6a2a2a; background:#2a0d0d; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+
+    .grid { display:grid; grid-template-columns: repeat(var(--cols), minmax(34px, 1fr)); gap:6px; }
+    .tile {
+      border:1px solid #223244; border-radius:10px;
+      padding:8px 6px; text-align:center; font-size:12px;
+      background:#0e141c; cursor:pointer; user-select:none;
+      display:flex; flex-direction:column; gap:4px; align-items:center; justify-content:center;
+      min-height:42px;
+    }
+    .tile .n { font-weight:700; }
+    .tile .k { font-size:10px; color:var(--muted); }
+    .tile.sel { outline:2px solid var(--accent); }
+    .badge { font-size:10px; padding:2px 6px; border-radius:999px; border:1px solid #223244; color:var(--muted); }
+    .badge.proof { border-color:#2a5666; color:#9fe9ff; }
+    .badge.jump { border-color:#5b4a2a; color:#ffd48f; }
+    .badge.boss { border-color:#6a2a2a; color:#ff9f9f; }
+
+    .kv { display:grid; grid-template-columns: 1fr; gap:10px; margin-top:10px; }
+    .kv > div { }
+    .muted { color:var(--muted); font-size:12px; }
+    .hr { height:1px; background:#1d2a38; margin:10px 0; }
+
+    .preview {
+      width:100%; aspect-ratio: 1 / 1; border-radius:12px;
+      border:1px solid #223244; background:#0e141c;
+      display:flex; align-items:center; justify-content:center; overflow:hidden;
+    }
+    .preview img { width:100%; height:100%; object-fit:cover; display:block; }
+    .small { font-size:11px; }
+    .top-controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .top-controls input[type="text"] { width: 320px; max-width: 80vw; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Snakes & Ladders Board Builder</h1>
+  <div class="top-controls">
+    <input id="boardUrl" type="text" placeholder="board.json URL (optional)" />
+    <button class="primary" id="loadBtn">Load</button>
+    <button id="importBtn">Import JSON</button>
+    <button class="primary" id="downloadBtn">Download board.json</button>
+  </div>
+  <span class="muted small" id="status">Ready.</span>
+</header>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="row" style="justify-content:space-between;">
+      <div class="row">
+        <div>
+          <label>Board Size</label>
+          <input id="boardSize" type="number" min="1" max="500" value="30" />
+        </div>
+        <div>
+          <label>Columns</label>
+          <input id="cols" type="number" min="5" max="40" value="10" />
+        </div>
+        <div>
+          <label>Tiles Base Path</label>
+          <input id="tilesBasePath" type="text" value="tiles" />
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="applySizeBtn" class="primary">Apply Size</button>
+        <button id="autoImagesBtn">Auto Image Names</button>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="muted small">
+      Click a tile to edit. Undefined tiles are allowed — but if you want unique tasks, add them here.
+      Jump tiles use <b>jumpTo</b>.
+    </div>
+
+    <div style="margin-top:10px;">
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row" style="justify-content:space-between;">
+      <div>
+        <div style="font-size:14px; font-weight:700;">Tile Editor</div>
+        <div class="muted small" id="tileSub">No tile selected.</div>
+      </div>
+      <button class="danger" id="deleteTileBtn" disabled>Delete Tile Override</button>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="preview" id="preview">
+      <span class="muted small">No image</span>
+    </div>
+
+    <div class="kv">
+      <div>
+        <label>Type</label>
+        <select id="type">
+          <option value="start">start</option>
+          <option value="task">task</option>
+          <option value="jump">jump</option>
+          <option value="boss">boss</option>
+          <option value="finish">finish</option>
+          <option value="empty">empty</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Requires Proof</label>
+        <select id="requiresProof">
+          <option value="auto">auto (based on type)</option>
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </select>
+        <div class="muted small">Auto = task/boss true, others false.</div>
+      </div>
+
+      <div id="jumpWrap" style="display:none;">
+        <label>jumpTo</label>
+        <input id="jumpTo" type="number" min="0" max="500" />
+      </div>
+
+      <div>
+        <label>Title</label>
+        <input id="title" type="text" />
+      </div>
+
+      <div>
+        <label>Description</label>
+        <textarea id="description"></textarea>
+      </div>
+
+      <div>
+        <label>Image (filename or URL)</label>
+        <input id="image" type="text" placeholder="e.g. 12.png" />
+        <div class="muted small">If it’s just a filename, preview uses Tiles Base Path.</div>
+      </div>
+
+      <div class="row" style="justify-content:space-between;">
+        <button class="primary" id="saveTileBtn" disabled>Save Tile</button>
+        <button id="clonePrevBtn" disabled>Clone Previous</button>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="muted small">
+      <b>Tip:</b> Keep <code>tiles</code> sparse.
+      Your backend already treats missing tiles as tasks (proof required), except start/finish.
+      Only add overrides for special tiles, boss tiles, and jump tiles.
+    </div>
+  </div>
+</div>
+
+<input id="fileInput" type="file" accept="application/json" style="display:none;" />
+
+<script>
+  // ---- model ----
+  let board = {
+    schemaVersion: 1,
+    id: "6degree-board",
+    title: "6Degree Snakes & Ladders",
+    description: "Complete tasks, submit proof, climb ladders, avoid snakes.",
+    boardSize: 30,
+    tilesBasePath: "tiles",
+    tiles: [
+      { id: 0, type: "start", title: "Start", description: "Begin your journey.", image: "0.png", requiresProof: false },
+      { id: 30, type: "finish", title: "Finish", description: "End of the board.", image: "30.png", requiresProof: false }
+    ]
+  };
+
+  let selectedId = null;
+
+  // ---- dom ----
+  const el = (id) => document.getElementById(id);
+  const statusEl = el("status");
+  const gridEl = el("grid");
+
+  const boardUrlEl = el("boardUrl");
+  const loadBtn = el("loadBtn");
+  const importBtn = el("importBtn");
+  const downloadBtn = el("downloadBtn");
+  const fileInput = el("fileInput");
+
+  const boardSizeEl = el("boardSize");
+  const colsEl = el("cols");
+  const tilesBasePathEl = el("tilesBasePath");
+  const applySizeBtn = el("applySizeBtn");
+  const autoImagesBtn = el("autoImagesBtn");
+
+  const tileSubEl = el("tileSub");
+  const deleteTileBtn = el("deleteTileBtn");
+  const previewEl = el("preview");
+  const typeEl = el("type");
+  const requiresProofEl = el("requiresProof");
+  const jumpWrapEl = el("jumpWrap");
+  const jumpToEl = el("jumpTo");
+  const titleEl = el("title");
+  const descriptionEl = el("description");
+  const imageEl = el("image");
+  const saveTileBtn = el("saveTileBtn");
+  const clonePrevBtn = el("clonePrevBtn");
+
+  // ---- helpers ----
+  function setStatus(msg) {
+    statusEl.textContent = msg;
+  }
+
+  function tileKey(tile) { return Number(tile.id); }
+
+  function getTileOverride(id) {
+    return board.tiles.find(t => Number(t.id) === Number(id)) || null;
+  }
+
+  function deleteTileOverride(id) {
+    board.tiles = board.tiles.filter(t => Number(t.id) !== Number(id));
+  }
+
+  function defaultTypeFor(id) {
+    if (id === 0) return "start";
+    if (id === Number(board.boardSize)) return "finish";
+    return "task";
+  }
+
+  function autoRequiresProof(type) {
+    const t = (type || "").toLowerCase();
+    return t === "task" || t === "boss";
+  }
+
+  function normalizeBoard() {
+    board.schemaVersion = 1;
+    board.boardSize = Number(board.boardSize);
+    board.tilesBasePath = (board.tilesBasePath || "tiles").toString();
+    if (!Array.isArray(board.tiles)) board.tiles = [];
+    // ensure start and finish exist as overrides (nice for display)
+    if (!getTileOverride(0)) board.tiles.push({ id: 0, type: "start", title: "Start", description: "", image: "0.png", requiresProof: false });
+    if (!getTileOverride(board.boardSize)) board.tiles.push({ id: board.boardSize, type: "finish", title: "Finish", description: "", image: board.boardSize + ".png", requiresProof: false });
+    // remove out-of-range
+    board.tiles = board.tiles
+      .filter(t => Number.isFinite(Number(t.id)) && Number(t.id) >= 0 && Number(t.id) <= board.boardSize)
+      .sort((a,b) => Number(a.id) - Number(b.id));
+  }
+
+  function tileLabelKind(tile) {
+    const type = (tile?.type || "").toLowerCase();
+    if (type === "jump") return "jump";
+    if (type === "boss") return "boss";
+    if (autoRequiresProof(type) || tile?.requiresProof === true) return "proof";
+    return "none";
+  }
+
+  function getTileEffective(id) {
+    const o = getTileOverride(id);
+    if (o) return o;
+    // effective defaults (what gameplay sees)
+    const type = defaultTypeFor(id);
+    return {
+      id,
+      type,
+      title: "",
+      description: "",
+      image: "",
+      requiresProof: autoRequiresProof(type)
+    };
+  }
+
+  function resolveImageSrc(tile) {
+    const img = (tile?.image || "").trim();
+    if (!img) return "";
+    if (/^https?:\/\//i.test(img)) return img;
+    const base = (board.tilesBasePath || "tiles").replace(/\/+$/,"");
+    return `${base}/${img}`;
+  }
+
+  function download(filename, text) {
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // ---- render ----
+  function renderGrid() {
+    gridEl.style.setProperty("--cols", String(Number(colsEl.value) || 10));
+    gridEl.innerHTML = "";
+
+    const size = Number(board.boardSize);
+    for (let i = 0; i <= size; i++) {
+      const t = getTileEffective(i);
+      const kind = tileLabelKind(t);
+
+      const div = document.createElement("div");
+      div.className = "tile" + (selectedId === i ? " sel" : "");
+      div.onclick = () => selectTile(i);
+
+      const n = document.createElement("div");
+      n.className = "n";
+      n.textContent = i;
+
+      const k = document.createElement("div");
+      k.className = "k";
+      k.textContent = (t.type || "").toLowerCase();
+
+      const badges = document.createElement("div");
+      badges.className = "row";
+      badges.style.gap = "6px";
+      badges.style.justifyContent = "center";
+
+      if (kind === "proof") {
+        const b = document.createElement("span");
+        b.className = "badge proof";
+        b.textContent = "proof";
+        badges.appendChild(b);
+      }
+      if (kind === "jump") {
+        const b = document.createElement("span");
+        b.className = "badge jump";
+        b.textContent = "jump";
+        badges.appendChild(b);
+      }
+      if (kind === "boss") {
+        const b = document.createElement("span");
+        b.className = "badge boss";
+        b.textContent = "boss";
+        badges.appendChild(b);
+      }
+
+      div.appendChild(n);
+      div.appendChild(k);
+      if (badges.childNodes.length) div.appendChild(badges);
+
+      gridEl.appendChild(div);
+    }
+  }
+
+  function renderEditor() {
+    const id = selectedId;
+    const o = (id === null) ? null : getTileOverride(id);
+    const t = (id === null) ? null : getTileEffective(id);
+
+    const hasSel = id !== null;
+    saveTileBtn.disabled = !hasSel;
+    clonePrevBtn.disabled = !hasSel || id === 0;
+    deleteTileBtn.disabled = !hasSel || !o;
+
+    if (!hasSel) {
+      tileSubEl.textContent = "No tile selected.";
+      typeEl.value = "task";
+      requiresProofEl.value = "auto";
+      jumpWrapEl.style.display = "none";
+      jumpToEl.value = "";
+      titleEl.value = "";
+      descriptionEl.value = "";
+      imageEl.value = "";
+      previewEl.innerHTML = '<span class="muted small">No image</span>';
+      return;
+    }
+
+    tileSubEl.textContent = `Editing tile ${id} (override: ${o ? "YES" : "NO"})`;
+
+    const type = (o?.type ?? t.type ?? "task").toLowerCase();
+    typeEl.value = type;
+
+    const req = o?.requiresProof;
+    if (typeof req === "boolean") requiresProofEl.value = String(req);
+    else requiresProofEl.value = "auto";
+
+    const jumpTo = (o?.jumpTo ?? "");
+    jumpToEl.value = (jumpTo === null || jumpTo === undefined) ? "" : String(jumpTo);
+
+    titleEl.value = (o?.title ?? t.title ?? "");
+    descriptionEl.value = (o?.description ?? t.description ?? "");
+    imageEl.value = (o?.image ?? t.image ?? "");
+
+    jumpWrapEl.style.display = (type === "jump") ? "block" : "none";
+
+    const src = resolveImageSrc({ image: imageEl.value });
+    if (src) {
+      previewEl.innerHTML = "";
+      const img = document.createElement("img");
+      img.src = src;
+      img.onerror = () => { previewEl.innerHTML = '<span class="muted small">Image not found</span>'; };
+      previewEl.appendChild(img);
+    } else {
+      previewEl.innerHTML = '<span class="muted small">No image</span>';
+    }
+  }
+
+  function renderAll() {
+    // sync top-level controls from model
+    boardSizeEl.value = String(board.boardSize);
+    tilesBasePathEl.value = String(board.tilesBasePath || "tiles");
+    renderGrid();
+    renderEditor();
+  }
+
+  function selectTile(id) {
+    selectedId = id;
+    renderAll();
+  }
+
+  // ---- actions ----
+  applySizeBtn.onclick = () => {
+    const n = Number(boardSizeEl.value);
+    if (!Number.isFinite(n) || n < 1 || n > 500) {
+      setStatus("Invalid board size (1..500).");
+      return;
+    }
+    board.boardSize = n;
+    board.tilesBasePath = tilesBasePathEl.value.trim() || "tiles";
+    normalizeBoard();
+    // if selection now out of range, clear it
+    if (selectedId !== null && selectedId > board.boardSize) selectedId = null;
+    setStatus("Board size applied.");
+    renderAll();
+  };
+
+  autoImagesBtn.onclick = () => {
+    // sets image to `${id}.png` for all overrides that are missing images
+    board.tilesBasePath = tilesBasePathEl.value.trim() || "tiles";
+    for (const t of board.tiles) {
+      if (!t.image || !String(t.image).trim()) {
+        t.image = `${t.id}.png`;
+      }
+    }
+    setStatus("Auto image names applied to overrides.");
+    renderAll();
+  };
+
+  typeEl.onchange = () => {
+    const type = typeEl.value.toLowerCase();
+    jumpWrapEl.style.display = (type === "jump") ? "block" : "none";
+    renderEditor();
+  };
+
+  imageEl.oninput = () => renderEditor();
+
+  clonePrevBtn.onclick = () => {
+    if (selectedId === null || selectedId <= 0) return;
+    const prev = getTileEffective(selectedId - 1);
+    titleEl.value = prev.title || "";
+    descriptionEl.value = prev.description || "";
+    imageEl.value = prev.image || "";
+    setStatus("Cloned previous tile fields.");
+    renderEditor();
+  };
+
+  saveTileBtn.onclick = () => {
+    if (selectedId === null) return;
+
+    const id = selectedId;
+    const type = (typeEl.value || "task").toLowerCase();
+    const title = titleEl.value.trim();
+    const description = descriptionEl.value.trim();
+    const image = imageEl.value.trim();
+
+    let requiresProof;
+    const rp = requiresProofEl.value;
+    if (rp === "true") requiresProof = true;
+    else if (rp === "false") requiresProof = false;
+    else requiresProof = undefined; // auto
+
+    let jumpTo;
+    if (type === "jump") {
+      const j = Number(jumpToEl.value);
+      if (!Number.isFinite(j) || j < 0 || j > board.boardSize) {
+        setStatus("jumpTo must be 0..boardSize.");
+        return;
+      }
+      jumpTo = j;
+    }
+
+    // ensure override exists
+    deleteTileOverride(id);
+    const tile = { id, type, title, description, image };
+    if (typeof requiresProof === "boolean") tile.requiresProof = requiresProof;
+    if (type === "jump") tile.jumpTo = jumpTo;
+
+    board.tiles.push(tile);
+    normalizeBoard();
+
+    setStatus(`Saved tile ${id}.`);
+    renderAll();
+  };
+
+  deleteTileBtn.onclick = () => {
+    if (selectedId === null) return;
+    deleteTileOverride(selectedId);
+    normalizeBoard();
+    setStatus(`Deleted override for tile ${selectedId}.`);
+    renderAll();
+  };
+
+  downloadBtn.onclick = () => {
+    normalizeBoard();
+    download("board.json", JSON.stringify(board, null, 2));
+    setStatus("Downloaded board.json (commit it to GitHub).");
+  };
+
+  importBtn.onclick = () => fileInput.click();
+
+  fileInput.onchange = async () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (!f) return;
+
+    try {
+      const text = await f.text();
+      board = JSON.parse(text);
+      normalizeBoard();
+      selectedId = null;
+      // sync controls
+      boardSizeEl.value = String(board.boardSize);
+      tilesBasePathEl.value = String(board.tilesBasePath || "tiles");
+      setStatus("Imported JSON.");
+      renderAll();
+    } catch (e) {
+      console.error(e);
+      setStatus("Import failed (invalid JSON).");
+    } finally {
+      fileInput.value = "";
+    }
+  };
+
+  loadBtn.onclick = async () => {
+    const url = boardUrlEl.value.trim() || "board.json";
+    try {
+      setStatus("Loading board.json...");
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      board = await res.json();
+      normalizeBoard();
+      selectedId = null;
+      boardSizeEl.value = String(board.boardSize);
+      tilesBasePathEl.value = String(board.tilesBasePath || "tiles");
+      setStatus("Loaded.");
+      renderAll();
+    } catch (e) {
+      console.error(e);
+      setStatus("Load failed. If using a URL, check CORS / path.");
+    }
+  };
+
+  // ---- init ----
+  normalizeBoard();
+  renderAll();
+</script>
+</body>
+</html>
