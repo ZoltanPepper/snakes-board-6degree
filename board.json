@@ -5,5 +5,13 @@
   "description": "Complete tasks, submit proof, climb ladders, avoid snakes.",
   "boardSize": 101,
   "tilesBasePath": "tiles",
-  "tiles": []
-}
+"tiles": [
+  {
+    "id": 0,
+    "type": "start",
+    "title": "Start",
+    "description": "Begin your journey.",
+    "image": "0.png",
+    "requiresProof": false
+  }
+]
