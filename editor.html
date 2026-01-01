@@ -464,7 +464,21 @@
     renderEditor();
   };
 
-  imageEl.oninput = () => renderEditor();
+  imageEl.oninput = () => {
+  // Update preview ONLY. Don't re-render editor fields while typing.
+  const src = resolveImageSrc(imageEl.value);
+  if (src) {
+    previewEl.innerHTML = "";
+    const img = document.createElement("img");
+    img.referrerPolicy = "no-referrer";
+    img.src = src;
+    img.onerror = () => { previewEl.innerHTML = '<span class="muted small">Image failed to load</span>'; };
+    previewEl.appendChild(img);
+  } else {
+    previewEl.innerHTML = '<span class="muted small">No image</span>';
+  }
+};
+
 
   clonePrevBtn.onclick = () => {
     if (selectedId === null || selectedId <= 0) return;
