@@ -246,6 +246,12 @@
     board.tiles = board.tiles.filter(t => Number(t.id) !== Number(id));
   }
 
+  function upsertTileOverride(tile) {
+    deleteTileOverride(tile.id);
+    board.tiles.push(tile);
+    normalizeBoard();
+  }
+
   function defaultTypeFor(id) {
     if (id === 0) return "start";
     if (id === Number(board.boardSize)) return "finish";
@@ -263,12 +269,10 @@
     board.tilesBasePath = (board.tilesBasePath || "tiles").toString();
     if (!Array.isArray(board.tiles)) board.tiles = [];
 
-    // Keep overrides in-range and sorted
     board.tiles = board.tiles
       .filter(t => Number.isFinite(Number(t.id)) && Number(t.id) >= 0 && Number(t.id) <= board.boardSize)
       .sort((a,b) => Number(a.id) - Number(b.id));
 
-    // Ensure start/finish overrides exist for UX
     if (!getTileOverride(0)) board.tiles.push({ id: 0, type: "start", title: "Start", description: "", image: "0.png", requiresProof: false });
     if (!getTileOverride(board.boardSize)) board.tiles.push({ id: board.boardSize, type: "finish", title: "Finish", description: "", image: board.boardSize + ".png", requiresProof: false });
 
@@ -409,7 +413,7 @@
     if (src) {
       previewEl.innerHTML = "";
       const img = document.createElement("img");
-      img.referrerPolicy = "no-referrer"; // helps some hosts
+      img.referrerPolicy = "no-referrer";
       img.src = src;
       img.onerror = () => { previewEl.innerHTML = '<span class="muted small">Image failed to load</span>'; };
       previewEl.appendChild(img);
@@ -454,32 +458,56 @@
     renderAll();
   };
 
-  // IMPORTANT FIX: allow changing type and saving it by creating an override on save
-typeEl.onchange = () => {
-  const type = (typeEl.value || "task").toLowerCase();
-  jumpWrapEl.style.display = (type === "jump") ? "block" : "none";
+  // IMPORTANT: make type "stick" by creating/updating an override immediately
+  typeEl.onchange = () => {
+    if (selectedId === null) return;
 
-  // IMPORTANT: do NOT call renderEditor() here, because it resets the select
-  // back to the effective/default type when there is no override yet.
-  setStatus(`Type set to "${type}". Click "Save Override" to commit.`);
-};
+    const id = selectedId;
+    const type = (typeEl.value || "task").toLowerCase();
+    jumpWrapEl.style.display = (type === "jump") ? "block" : "none";
 
+    const tile = {
+      id,
+      type,
+      title: titleEl.value.trim(),
+      description: descriptionEl.value.trim(),
+      image: imageEl.value.trim()
+    };
 
+    const category = categoryEl.value.trim();
+    if (category) tile.category = category;
+
+    const rp = requiresProofEl.value;
+    if (rp === "true") tile.requiresProof = true;
+    else if (rp === "false") tile.requiresProof = false;
+
+    if (type === "jump") {
+      const jRaw = jumpToEl.value.trim();
+      if (jRaw) {
+        const j = Number(jRaw);
+        if (Number.isFinite(j)) tile.jumpTo = j;
+      }
+    }
+
+    upsertTileOverride(tile);
+    setStatus(`Type saved as "${type}" for tile ${id}.`);
+    renderAll();
+  };
+
+  // Update preview ONLY; do not re-render editor fields while typing
   imageEl.oninput = () => {
-  // Update preview ONLY. Don't re-render editor fields while typing.
-  const src = resolveImageSrc(imageEl.value);
-  if (src) {
-    previewEl.innerHTML = "";
-    const img = document.createElement("img");
-    img.referrerPolicy = "no-referrer";
-    img.src = src;
-    img.onerror = () => { previewEl.innerHTML = '<span class="muted small">Image failed to load</span>'; };
-    previewEl.appendChild(img);
-  } else {
-    previewEl.innerHTML = '<span class="muted small">No image</span>';
-  }
-};
-
+    const src = resolveImageSrc(imageEl.value);
+    if (src) {
+      previewEl.innerHTML = "";
+      const img = document.createElement("img");
+      img.referrerPolicy = "no-referrer";
+      img.src = src;
+      img.onerror = () => { previewEl.innerHTML = '<span class="muted small">Image failed to load</span>'; };
+      previewEl.appendChild(img);
+    } else {
+      previewEl.innerHTML = '<span class="muted small">No image</span>';
+    }
+  };
 
   clonePrevBtn.onclick = () => {
     if (selectedId === null || selectedId <= 0) return;
@@ -519,7 +547,6 @@ typeEl.onchange = () => {
       jumpTo = j;
     }
 
-    // Always replace the override cleanly
     deleteTileOverride(id);
 
     const tile = { id, type, title, description, image };
@@ -596,4 +623,3 @@ typeEl.onchange = () => {
 </script>
 </body>
 </html>
-
