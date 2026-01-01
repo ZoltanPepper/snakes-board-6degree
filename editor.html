@@ -455,14 +455,15 @@
   };
 
   // IMPORTANT FIX: allow changing type and saving it by creating an override on save
-  typeEl.onchange = () => {
-    const type = (typeEl.value || "task").toLowerCase();
-    jumpWrapEl.style.display = (type === "jump") ? "block" : "none";
+typeEl.onchange = () => {
+  const type = (typeEl.value || "task").toLowerCase();
+  jumpWrapEl.style.display = (type === "jump") ? "block" : "none";
 
-    // If no override exists, we *don't* auto-create one yet (keeps tiles sparse),
-    // but editor will save the selected type into a new override when you click Save.
-    renderEditor();
-  };
+  // IMPORTANT: do NOT call renderEditor() here, because it resets the select
+  // back to the effective/default type when there is no override yet.
+  setStatus(`Type set to "${type}". Click "Save Override" to commit.`);
+};
+
 
   imageEl.oninput = () => {
   // Update preview ONLY. Don't re-render editor fields while typing.
